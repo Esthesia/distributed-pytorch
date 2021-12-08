@@ -1,47 +1,7 @@
 # Distributed training with PyTorch
-## Publication
-Kindratenko, Volodymyr, Dawei Mu, Yan Zhan, John Maloney, Sayed Hadi Hashemi, Benjamin Rabe, Ke Xu, Roy Campbell, Jian Peng, and William Gropp. "HAL: Computer System for Scalable Deep Learning." In Practice and Experience in Advanced Research Computing, pp. 41-48. 2020. https://doi.org/10.1145/3311790.3396649.
-
-## Overview
-
-We will focus on: 
-- distributed mixed precision training with NVIDIA `Apex`
-
-We will cover the following training methods for PyTorch:
-- regular, single node, single GPU training
-- `torch.nn.DataParallel`
-- `torch.nn.DistributedDataParallel`
-- distributed mixed precision training with NVIDIA `Apex`
-- `TensorBoard` logging under distributed training context
-
-We will cover the following use cases:
-- Single node single GPU training
-- Single node multi-GPU training
-- Multi-node multi-GPU training
-
-## Results, Learning Curves, Visualizations
-
-### Learning Curves
-
-![](figures/benchmark_feb/top1_train.png) 
-
-![](figures/benchmark_feb/top1_val.png)
-
-![](figures/benchmark_feb/top5_train.png) 
-
-![](figures/benchmark_feb/top5_val.png)
-
-### Scalability Analysis
-
-![](figures/benchmark_feb/training_throughput.png)
-    
-![](figures/benchmark_feb/training_time.png)
-
-### I/O Performance
-
-![](figures/benchmark_feb/IO.png)
-
-- Please see `RESULTS.md` for more details
+## Based on the Publication of HAL
+Kindratenko, Volodymyr, Dawei Mu, Yan Zhan, John Maloney, Sayed Hadi Hashemi, Benjamin Rabe, Ke Xu, Roy Campbell, Jian Peng, and William Gropp. 
+"HAL: Computer System for Scalable Deep Learning." In Practice and Experience in Advanced Research Computing, pp. 41-48. 2020. https://doi.org/10.1145/3311790.3396649.
 
 ## Requirements
 
@@ -57,77 +17,6 @@ We will cover the following use cases:
     $ cd apex
     $ pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
     ```
-
-## Updates since the tutorial was written
-- automatic mixed precision (AMP) training is now native in PyTorch 1.6. Use `torch.cuda.amp` instead of `apex.amp`. See https://pytorch.org/blog/accelerating-training-on-nvidia-gpus-with-pytorch-automatic-mixed-precision/ for more details. 
-- in addition to FP16-FP32 mixed-precision training, people in the industry start to use quantization-aware training (QAT) using INT8 for even better perfomance. Checkout this post from NVIDIA: https://developer.nvidia.com/blog/improving-int8-accuracy-using-quantization-aware-training-and-the-transfer-learning-toolkit/.
-
-## FP16 and FP32 mixed precision distributed training with NVIDIA `Apex` (Recommended)
-
-References:
-
-- mnist apex: https://github.com/yangkky/distributed_tutorial/blob/master/src/mnist-mixed.py
-- apex examples: https://github.com/nvidia/apex/tree/master/examples
-- apex tutorial: https://devblogs.nvidia.com/apex-pytorch-easy-mixed-precision-training/
-- apex tutorial: https://developer.nvidia.com/automatic-mixed-precision
-- apex doc: https://docs.nvidia.com/deeplearning/sdk/mixed-precision-training/index.html
-- apex in PyTorch 1.6.0: https://pytorch.org/blog/accelerating-training-on-nvidia-gpus-with-pytorch-automatic-mixed-precision/
-
-Mixed precision training: majority of the network uses FP16 arithmetic, while automatically casting potentially unstable operations to FP32.
-
-Key points:
-- Ensuring that weight updates are carried out in FP32.
-- Loss scaling to prevent underflowing gradients.
-- A few operations (e.g. large reductions) left in FP32.
-- Everything else (the majority of the network) executed in FP16.
-
-Advantages:
-- reducing memory storage/bandwidth demands by 2x
-- use larger batch sizes
-- take advantage of NVIDIA Tensor Cores for matrix multiplications and convolutions
-- don't need to explicitly convert your model, or the input data, to half().
-
-**`imagenet_ddp_mixprec.py` is deprecated. Use `imagenet_ddp_apex.py`.**
-
-### Single node, multiple GPUs:
-
-```bash
-python -m torch.distributed.launch --nproc_per_node=4 imagenet_ddp_apex.py -a resnet50 --b 208 --workers 20 --opt-level O2 /home/shared/imagenet/raw/
-```
-
-### Multiple nodes, multiple GPUs:
-
-To run your programe on 2 nodes with 4 GPU each, you will need to open 2 terminals and run slightly different command on each node.
-
-Node 0:
-```bash
-python -m torch.distributed.launch --nproc_per_node=4 --nnodes=2 --node_rank=0 --master_addr="192.168.100.11" --master_port=8888 imagenet_ddp_apex.py -a resnet50 --b 208 --workers 20 --opt-level O2 /home/shared/imagenet/raw/
-```
-
-- torch distributed launch module: https://github.com/pytorch/pytorch/blob/master/torch/distributed/launch.py
-- `--nproc_per_node`: number of GPUs on the current node, each process is bound to a single GPU
-- `----node_rank`: rank of the current node, should be an int between `0` and `--world-size - 1`
-- `--master_addr`: IP address for the master node of your choice. type `str`
-- `--master_port`: open port number on the master node. type `int`. if you don't know, use `8888`
-- `--workers`: # of data loading workers for the current node. this is different from the processes that run the programe on each GPU. the total # of processes = # of data loading workers + # of GPUs (one process to run each GPU)
-- `-b`: per GPU batch size, for a 16 GB GPU, `224` is the max batch size. Need to be a multiple of 8 to make use of Tensor Cores. **If you are using tensorboard logging, you need to assign a slightly smaller batch size!**
-
-Node 1:
-```bash
-python -m torch.distributed.launch --nproc_per_node=4 --nnodes=2 --node_rank=1 --master_addr="192.168.100.11" --master_port=8888 imagenet_ddp_apex.py -a resnet50 --b 208 --workers 20 --opt-level O2 /home/shared/imagenet/raw/
-```
-
-### FQA
-
-1. The following message is normal behavior with dynamic loss scaling, and it usually happens in the first few iterations because Amp begins by trying a high loss scale.
-```
-Gradient overflow.  Skipping step, loss scaler 0 reducing loss scale to 4096.0Gradient overflow.
-```
-
-2. For multi-process training, even if you `ctrl C` on each compute node, there will still be some processes alive. To clean up all python processes on curr node, use:
-```
-pkill -9 python
-```
 
 ## Non-distributed (ND) training
 
@@ -162,14 +51,6 @@ References:
 Use cases:
 - Single node multi-GPU training
 - Multi-node multi-GPU training
-
-References: 
-- https://yangkky.github.io/2019/07/08/distributed-pytorch-tutorial.html
-- https://github.com/yangkky/distributed_tutorial/blob/master/src/mnist-distributed.py
-- https://github.com/pytorch/examples/blob/master/imagenet/main.py
-- https://medium.com/intel-student-ambassadors/distributed-training-of-deep-learning-models-with-pytorch-1123fa538848
-- http://www.telesens.co/2019/04/04/distributed-data-parallel-training-using-pytorch-on-aws/
-- http://seba1511.net/dist_blog/
 
 `torch.nn.DistributedDataParallel` is the recommeded way of doing distributed training in PyTorch. It is proven to be significantly faster than `torch.nn.DataParallel` for single-node multi-GPU data parallel training. `nccl` backend is currently the fastest and highly recommended backend to be used with distributed training and this applies to both single-node and multi-node distributed training.
 
@@ -217,20 +98,3 @@ Node 3:
 python  imagenet_ddp.py -a resnet50 --dist-url 'tcp://MASTER_IP:MASTER_PORT' --dist-backend 'nccl' --world-size 4 --rank 3 --desired-acc 0.75 /home/shared/imagenet/raw/
 ```
 
-## `TensorBoard`
-`TensorBoard` is now a built-in module in PyTorch: `torch.utils.tensorboard`
-- https://pytorch.org/docs/stable/tensorboard.html
-- https://pytorch.org/tutorials/intermediate/tensorboard_tutorial.html?highlight=tensorboard
-- https://www.tensorflow.org/tensorboard/get_started
-
-## Distributed training with `Horovod`
-
-References:
-
-- https://docs.databricks.com/applications/deep-learning/distributed-training/mnist-pytorch.html
-- https://horovod.readthedocs.io/en/latest/pytorch.html
-- https://github.com/horovod/horovod/blob/master/docs/pytorch.rst
-
-## Acknowledgment
-
-Shout-out to all the references, blogs, code samples... used in this tutorial!

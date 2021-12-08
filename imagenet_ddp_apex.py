@@ -121,7 +121,7 @@ def main():
         # this will be 0-3 if you have 4 GPUs on curr node
         args.gpu = args.local_rank
         torch.cuda.set_device(args.gpu)
-        torch.distributed.init_process_group(backend='nccl',
+        torch.distributed.init_process_group(backend='gloo',
                                              init_method='env://')
         # this is the total # of GPUs across all nodes
         # if using 2 nodes with 4 GPUs each, world size is 8
